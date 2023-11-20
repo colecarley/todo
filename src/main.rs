@@ -16,7 +16,8 @@ fn main() {
         println!("{}", list);
         std::io::stdin().read_line(&mut instruction).expect("Could not read instruction");
         instruction = instruction.trim().to_string();
-        let tokens: Vec<&str> = instruction.split(' ').collect();
+        let intermediate = instruction.clone();
+        let tokens: Vec<&str> = intermediate.split(' ').collect();
         match tokens[0] {
             "a" => {
                 let item = tokens[1..].join(" ");
@@ -26,32 +27,10 @@ fn main() {
                     list.add_todo(item);
                 }
             },
-            "m" => {
-                if tokens.len() < 2 {
-                        reset(&mut instruction, Some("Please enter an index".red()));
-                } else {
-                    let index = tokens[1].parse::<usize>();
-                    if index.is_err() {
-                            reset(&mut instruction, Some("Please enter a valid index".red()));
-                    } else if !list.mark_not_done(index.unwrap()) {
-                            reset(&mut instruction, Some("Please enter a valid index".red()));
-                    }
-                }
-            },
-            "!m" => {
-                if tokens.len() < 2 {
-                        reset(&mut instruction, Some("Please enter an index".red()));
-                } else {
-                    let index = tokens[1].parse::<usize>();
-                    if index.is_err() {
-                            reset(&mut instruction, Some("Please enter a valid index".red()));
-                    } else if !list.mark_done(index.unwrap()) {
-                            reset(&mut instruction, Some("Please enter a valid index".red()));
-                    }
-                }
-            }
+            "m" => handle_indexed_instruction(&tokens, &mut instruction,  |index| !list.mark_done(index)),
+            "!m" => handle_indexed_instruction(&tokens, &mut instruction,  |index| !list.mark_not_done(index)),
             "d" => {
-                if tokens.len() < 2 {
+                if tokens.len() > 2 {
                     reset(&mut instruction, Some("Please enter an index".red()));
                 }
                 else {
@@ -60,55 +39,16 @@ fn main() {
                         list.remove_all();
                         instruction.clear();
                     } else {
-                        let index = first.parse::<usize>();
-                        if index.is_err() {
-
-                            reset(&mut instruction, Some("Please enter a valid index".red()));
-                        } else if !list.remove(index.unwrap()) {
-                            reset(&mut instruction, Some("Please enter a valid index".red()));
-                        }
+                        handle_indexed_instruction(&tokens, &mut instruction, |index| !list.remove(index));
                     }
                 }
             },
-            "i" => {
-                if tokens.len() < 2 {
-                    reset(&mut instruction, Some("Please enter an index".red()));
-                } else {
-                    let index = tokens[1].parse::<usize>();
-                    if index.is_err() {
-                            reset(&mut instruction, Some("Please enter a valid index".red()));
-                    } else if !list.mark_important(index.unwrap()) {
-                            reset(&mut instruction, Some("Please enter a valid index".red()));
-                    }
-                }
-            },
-            "!i" => {
-                if tokens.len() < 2 {
-                    reset(&mut instruction, Some("Please enter an index".red()));
-                } else {
-                    let index = tokens[1].parse::<usize>();
-                    if index.is_err() {
-                        reset(&mut instruction, Some("Please enter a valid index".red()));
-                    } else if !list.mark_unimportant(index.unwrap()) {
-                        reset(&mut instruction, 
-                            Some("Please enter a valid index".red() ));
-                    }
-                }
-            }
-            "clean" => {
-                list.remove_completed();
-            },
+            "i" => handle_indexed_instruction(&tokens, &mut instruction, |index| !list.mark_important(index)),
+            "!i" => handle_indexed_instruction(&tokens, &mut instruction, |index| !list.mark_unimportant(index)),
+            "clean" => list.remove_completed(),
             "help" => {
                 reset(&mut instruction, None);
-                println!("Commands:");
-                println!("{}{}", "\ta <item>".red(), " - (a)dd an item to the list");
-                println!("{}{}", "\tm <index>".red(), " - (m)ark an item as done");
-                println!("{}{}", "\td <index>".red(), " - (d)elete an item from the list");
-                println!("{}{}", "\td all".red(), " - (d)elete all items from the list");
-                println!("{}{}", "\ti <index>".red(), " - Mark an item as (i)mportant");
-                println!("{}{}", "\t!i <index>".red(), " - Mark an item as un(i)mportant");
-                println!("{}{}", "\tclean".red(), " - Remove all completed items from the list");
-                println!("{}{}", "\texit".red(), " - Exit the program");
+                print_help(); 
                 instruction.clear();
                 pause();
             },
@@ -122,6 +62,31 @@ fn main() {
         }
         reset(&mut instruction, None);
     }
+}
+
+fn handle_indexed_instruction(tokens: &Vec<&str>, mut instruction: &mut String, mut function: impl FnMut(usize) -> bool) {
+    if tokens.len() < 2 {
+        reset(&mut instruction, Some("Please enter an index".red()));
+    } else {
+        let index = tokens[1].parse::<usize>();
+        if index.is_err() {
+                reset(&mut instruction, Some("Please enter a valid index".red()));
+        } else if function(index.unwrap()){
+                reset(&mut instruction, Some("Please enter a valid index".blue()));
+        }
+    } 
+}
+
+fn print_help() {
+    println!("Commands:");
+    println!("{}{}", "\ta <item>".red(), " - (a)dd an item to the list");
+    println!("{}{}", "\tm <index>".red(), " - (m)ark an item as done");
+    println!("{}{}", "\td <index>".red(), " - (d)elete an item from the list");
+    println!("{}{}", "\td all".red(), " - (d)elete all items from the list");
+    println!("{}{}", "\ti <index>".red(), " - Mark an item as (i)mportant");
+    println!("{}{}", "\t!i <index>".red(), " - Mark an item as un(i)mportant");
+    println!("{}{}", "\tclean".red(), " - Remove all completed items from the list");
+    println!("{}{}", "\texit".red(), " - Exit the program");
 }
 
 fn reset(instruction: &mut String, message: Option<ColoredString>) { 

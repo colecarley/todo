@@ -2,6 +2,8 @@
 use std::fmt;
 use mysql::*;
 use mysql::prelude::*;
+use dotenv::dotenv;
+use std::env;
 
 pub struct TodoList {
     list: Vec<todo_item::TodoItem>,
@@ -17,8 +19,10 @@ impl TodoList {
     }
 
     pub fn get_conn(&mut self) {
-        let url = "mysql://root:m7c3TDcnU_o@!U9.APnbFm@e@localhost:3306/todo_list";
-        let pool = Pool::new(url).expect("Failed to create pool");
+        dotenv().ok();
+        let password = env::var("PASSWORD").expect("Failed to get password");
+        let url = format!("mysql://root:{}@localhost:3306/todo_list",password);
+        let pool = Pool::new(url.as_str()).expect("Failed to create pool");
 
         let conn = pool.get_conn().expect("Failed to get connection");
         self.conn = Some(conn);
@@ -57,6 +61,7 @@ impl TodoList {
         }
 
         self.list.push(new_todo);
+        self.sort();
     }
 
     pub fn remove_completed(&mut self) {

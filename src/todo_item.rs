@@ -17,7 +17,7 @@ impl TodoItem {
             name: name,
             completed: false,
             important: false,
-            id: Uuid::new_v4().to_string()
+            id: Uuid::new_v4().to_string(),
         }
     }
 

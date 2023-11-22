@@ -8,7 +8,6 @@ fn main() {
     let mut list = todo_list::TodoList::new();
     list.get_conn();
     list.load_all_todos();
-
     let mut instruction = String::new();
     display_start();
     reset(&mut instruction, None);

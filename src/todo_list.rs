@@ -1,7 +1,8 @@
-#[path = "./todo_item.rs"] mod todo_item;
-use std::fmt;
+#[path = "./todo_item.rs"]
+mod todo_item;
 use sqlite;
 use std::env;
+use std::fmt;
 
 pub struct TodoList {
     list: Vec<todo_item::TodoItem>,
@@ -23,40 +24,64 @@ impl TodoList {
         self.conn = Some(connection);
 
         if let Some(ref mut conn) = self.conn {
+            conn.execute("DROP TABLE IF EXISTS todo_item;")
+                .expect("Failed to drop table.");
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS todo_item (
                     todo_name TEXT NOT NULL,
                     id TEXT NOT NULL,
                     completed BOOLEAN NOT NULL,
                     important BOOLEAN NOT NULL,
-                    folder_id TEXT NOT NULL
+                    folder_id TEXT
                 )",
-            ).expect("Failed to create table.");
+            )
+            .expect("Failed to create table.");
         }
     }
 
     pub fn load_all_todos(&mut self) {
         if let Some(ref mut conn) = self.conn {
-
             let query = "SELECT * FROM todo_item";
             for row in conn
-            .prepare(query)
-            .unwrap()
-            .into_iter()
-            .map(|row| row.unwrap())
+                .prepare(query)
+                .expect("Failed to prepare statement.")
+                .into_iter()
+                .map(|row| row.expect("Failed to get row."))
             {
-                self.list.push(
-                    todo_item::TodoItem {
-                        name: row.read::<&str, _>("todo_name").to_string(),
-                        id: row.read::<&str, _>("id").to_string(),
-                        completed: row.read::<i64, _>("completed") != 0,
-                        important: row.read::<i64, _>("important") != 0,
-                    }
-                )
+                self.list.push(todo_item::TodoItem {
+                    name: row.read::<&str, _>("todo_name").to_string(),
+                    id: row.read::<&str, _>("id").to_string(),
+                    completed: row.read::<i64, _>("completed") != 0,
+                    important: row.read::<i64, _>("important") != 0,
+                    folder_id: Some(row.read::<&str, _>("folder_id").to_string()),
+                })
             }
             self.sort();
         }
     }
+
+    // pub fn load_todos_in_folder(&mut self, folder_id: String) {
+    //     self.list.clear();
+    //     if let Some(ref mut conn) = self.conn {
+    //         let query = format!("SELECT * FROM todo_item WHERE folder_id = '{}'", folder_id);
+
+    //         for row in conn
+    //             .prepare(query)
+    //             .unwrap()
+    //             .into_iter()
+    //             .map(|row| row.unwrap())
+    //         {
+    //             self.list.push(todo_item::TodoItem {
+    //                 name: row.read::<&str, _>("todo_name").to_string(),
+    //                 id: row.read::<&str, _>("id").to_string(),
+    //                 completed: row.read::<i64, _>("completed") != 0,
+    //                 important: row.read::<i64, _>("important") != 0,
+    //                 folder_id: Some(row.read::<&str, _>("folder_id").to_string()),
+    //             })
+    //         }
+    //     }
+    //     self.sort();
+    // }
 
     pub fn add_todo(&mut self, name: String) {
         let new_todo = todo_item::TodoItem::new(name);
@@ -64,10 +89,10 @@ impl TodoList {
         if let Some(ref mut conn) = self.conn {
             let query = format!(
                 "INSERT INTO todo_item (todo_name, completed, important, id) 
-                VALUES ('{}', {}, {}, '{}')", 
-                new_todo.name, 
-                new_todo.completed, 
-                new_todo.important, 
+                VALUES ('{}', {}, {}, '{}')",
+                new_todo.name,
+                new_todo.completed,
+                new_todo.important,
                 new_todo.id.to_string()
             );
 
@@ -79,123 +104,162 @@ impl TodoList {
     }
 
     pub fn remove_completed(&mut self) {
-        if let Some(ref mut conn)  = self.conn {
-            conn.execute("DELETE FROM todo_item WHERE completed = true").expect("Failed to delete data.");
+        if let Some(ref mut conn) = self.conn {
+            conn.execute("DELETE FROM todo_item WHERE completed = true")
+                .expect("Failed to delete data.");
         }
 
-        self.list = self.list.iter().cloned().filter(|todo| !todo.completed).collect::<Vec<todo_item::TodoItem>>();
+        self.list = self
+            .list
+            .iter()
+            .cloned()
+            .filter(|todo| !todo.completed)
+            .collect::<Vec<todo_item::TodoItem>>();
     }
 
     pub fn mark_not_done(&mut self, index: usize) -> bool {
         let todo = self.get_val(index);
-        if todo.is_none() {return false;}
-        let id = todo.unwrap().id.clone(); 
+        if todo.is_none() {
+            return false;
+        }
+        let id = todo.unwrap().id.clone();
 
         if let Some(ref mut conn) = self.conn {
             let query = format!(
-                "UPDATE todo_item SET completed = false WHERE id = '{}'", 
+                "UPDATE todo_item SET completed = false WHERE id = '{}'",
                 id.to_string()
             );
 
             conn.execute(query).expect("Failed to update data.");
         }
 
-        let result = self.list.iter_mut().find(|todo| todo.id == id).map(|todo| todo.mark_not_done()).is_some();
+        let result = self
+            .list
+            .iter_mut()
+            .find(|todo| todo.id == id)
+            .map(|todo| todo.mark_not_done())
+            .is_some();
         self.sort();
         result
     }
 
     pub fn mark_done(&mut self, index: usize) -> bool {
         let todo = self.get_val(index);
-        if todo.is_none() {return false;}
+        if todo.is_none() {
+            return false;
+        }
         let id = todo.unwrap().id.clone();
 
         if let Some(ref mut conn) = self.conn {
             let query = format!(
-                "UPDATE todo_item SET completed = true WHERE id = '{}'", 
+                "UPDATE todo_item SET completed = true WHERE id = '{}'",
                 id.to_string()
             );
 
             conn.execute(query).expect("Failed to update data.");
         }
 
-        let result = self.list.iter_mut().find(|todo| todo.id == id).map(|todo| todo.mark_done()).is_some();
+        let result = self
+            .list
+            .iter_mut()
+            .find(|todo| todo.id == id)
+            .map(|todo| todo.mark_done())
+            .is_some();
         self.sort();
         result
     }
 
     pub fn remove(&mut self, index: usize) -> bool {
         let todo = self.get_val(index);
-        if todo.is_none() {return false;}
+        if todo.is_none() {
+            return false;
+        }
         let id = todo.unwrap().id.clone();
 
         if let Some(ref mut conn) = self.conn {
-            let query = format!(
-                "DELETE FROM todo_item WHERE id = '{}'", 
-                id.to_string()
-            );
+            let query = format!("DELETE FROM todo_item WHERE id = '{}'", id.to_string());
 
             conn.execute(query).expect("Failed to delete data.");
         }
 
-        self.list = self.list.iter().cloned().filter(|todo| todo.id != id).collect::<Vec<todo_item::TodoItem>>();
+        self.list = self
+            .list
+            .iter()
+            .cloned()
+            .filter(|todo| todo.id != id)
+            .collect::<Vec<todo_item::TodoItem>>();
         self.sort();
         true
     }
 
     pub fn mark_important(&mut self, index: usize) -> bool {
         let todo = self.get_val(index);
-        if todo.is_none() {return false;}
+        if todo.is_none() {
+            return false;
+        }
 
         let id = todo.unwrap().id.clone();
 
         if let Some(ref mut conn) = self.conn {
             let query = format!(
-                "UPDATE todo_item SET important = true WHERE id = '{}'", 
+                "UPDATE todo_item SET important = true WHERE id = '{}'",
                 id.to_string()
             );
 
             conn.execute(query).expect("Failed to update data.");
         }
 
-        let result = self.list.iter_mut().find(|todo| todo.id == id).map(|todo| todo.mark_important()).is_some();
+        let result = self
+            .list
+            .iter_mut()
+            .find(|todo| todo.id == id)
+            .map(|todo| todo.mark_important())
+            .is_some();
         self.sort();
         result
     }
 
     pub fn mark_unimportant(&mut self, index: usize) -> bool {
         let todo = self.get_val(index);
-        if todo.is_none() {return false;}
+        if todo.is_none() {
+            return false;
+        }
 
         let id = todo.unwrap().id.clone();
 
         if let Some(ref mut conn) = self.conn {
             let query = format!(
-                "UPDATE todo_item SET important = false WHERE id = '{}'", 
+                "UPDATE todo_item SET important = false WHERE id = '{}'",
                 id.to_string()
             );
 
             conn.execute(query).expect("Failed to update data.");
         }
 
-        let result = self.list.iter_mut().find(|todo| todo.id == id).map(|todo| todo.mark_unimportant()).is_some();
+        let result = self
+            .list
+            .iter_mut()
+            .find(|todo| todo.id == id)
+            .map(|todo| todo.mark_unimportant())
+            .is_some();
         self.sort();
         result
     }
 
     pub fn remove_all(&mut self) {
         if let Some(ref mut conn) = self.conn {
-            conn.execute("DELETE FROM todo_item").expect("Failed to delete data.");
+            conn.execute("DELETE FROM todo_item")
+                .expect("Failed to delete data.");
         }
         self.list.clear();
     }
 
-    fn sort (&mut self) {
+    fn sort(&mut self) {
         self.list.sort_by(|a, b| b.important.cmp(&a.important));
         self.list.sort_by(|a, b| a.completed.cmp(&b.completed));
     }
 
-    fn get_val(&mut self, index: usize) -> Option<todo_item::TodoItem>{
+    fn get_val(&mut self, index: usize) -> Option<todo_item::TodoItem> {
         if (0..self.list.len()).contains(&(index - 1)) {
             return Some(self.list[index - 1].clone());
         }
@@ -215,4 +279,3 @@ impl fmt::Display for TodoList {
         Ok(())
     }
 }
-

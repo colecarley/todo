@@ -1,5 +1,5 @@
-use std::fmt;
 use colored::Colorize;
+use std::fmt;
 use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -8,8 +8,8 @@ pub struct TodoItem {
     pub completed: bool,
     pub important: bool,
     pub id: String,
+    pub folder_id: Option<String>,
 }
-
 
 impl TodoItem {
     pub fn new(name: String) -> TodoItem {
@@ -18,6 +18,7 @@ impl TodoItem {
             completed: false,
             important: false,
             id: Uuid::new_v4().to_string(),
+            folder_id: None,
         }
     }
 
@@ -29,11 +30,11 @@ impl TodoItem {
         self.completed = false;
     }
 
-    pub fn mark_important (&mut self) {
+    pub fn mark_important(&mut self) {
         self.important = true;
     }
 
-    pub fn mark_unimportant (&mut self) {
+    pub fn mark_unimportant(&mut self) {
         self.important = false;
     }
 }
@@ -41,9 +42,19 @@ impl TodoItem {
 impl fmt::Display for TodoItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.important {
-            write!(f, "[{}] {}", if self.completed {'\u{2713}'} else {' '}, self.name.red())
+            write!(
+                f,
+                "[{}] {}",
+                if self.completed { '\u{2713}' } else { ' ' },
+                self.name.red()
+            )
         } else {
-            write!(f, "[{}] {}", if self.completed {'\u{2713}'} else {' '}, self.name)
+            write!(
+                f,
+                "[{}] {}",
+                if self.completed { '\u{2713}' } else { ' ' },
+                self.name
+            )
         }
     }
 }
